@@ -1,0 +1,21 @@
+2025-09-30 16:34:57 - eztravel_travel_crawler - WARNING - API 響應成功但 'data' 欄位為 null，可能存在未捕獲的錯誤。Head: {'code': 0, 'message': ''}, Response: {"head": {"code": 0, "message": ""}, "data": null}
+2025-09-30 16:34:57 - eztravel_travel_crawler - WARNING - eztravel 系統去程查詢沒有資料
+2025-09-30 16:34:57 - eztravel_travel_crawler - WARNING - API 響應成功但 'data' 欄位為 null，可能存在未捕獲的錯誤。Head: {'code': 0, 'message': ''}, Response: {"head": {"code": 0, "message": ""}, "data": null}
+2025-09-30 16:34:57 - eztravel_travel_crawler - WARNING - ct 系統去程查詢沒有資料
+2025-09-30 16:35:05 - eztravel_travel_crawler - WARNING - 嘗試轉換空數據為JSON，返回空陣列
+2025-09-30 16:35:05 - eztravel_travel_crawler - ERROR - 嘗試轉換空數據為表格格式: 嘗試轉換空數據為表格格式
+NoneType: None
+2025-09-30 16:35:05 - eztravel_travel_crawler - ERROR - 爬蟲任務 e5938a4a-fd7c-4388-a450-fe91a8136c6e 執行出錯: 嘗試轉換空數據為表格格式: 嘗試轉換空數據為表格格式
+Traceback (most recent call last):
+  File "c:\Users\wu020\Documents\github\eztravel-tour-fare-scraper-data\eztravel_travel_crawler\controllers\crawler_controller.py", line 111, in _execute_crawling_task
+    table_result = data_processor.convert_to_table()
+  File "c:\Users\wu020\Documents\github\eztravel-tour-fare-scraper-data\eztravel_travel_crawler\processors\data_processor.py", line 82, in convert_to_table
+    raise ValueError("嘗試轉換空數據為表格格式")
+ValueError: 嘗試轉換空數據為表格格式
+2025-09-30 16:35:05 - eztravel_travel_crawler - ERROR - 錯誤: 嘗試轉換空數據為表格格式: 嘗試轉換空數據為表格格式
+Traceback (most recent call last):
+  File "c:\Users\wu020\Documents\github\eztravel-tour-fare-scraper-data\eztravel_travel_crawler\controllers\crawler_controller.py", line 111, in _execute_crawling_task
+    table_result = data_processor.convert_to_table()
+  File "c:\Users\wu020\Documents\github\eztravel-tour-fare-scraper-data\eztravel_travel_crawler\processors\data_processor.py", line 82, in convert_to_table
+    raise ValueError("嘗試轉換空數據為表格格式")
+ValueError: 嘗試轉換空數據為表格格式

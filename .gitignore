@@ -1,0 +1,17 @@
+# Virtual Environment
+venv/
+env/
+ENV/
+.env
+.venv
+.DS_Store
+
+# Python version files
+.python-version
+.python
+.python-version.txt
+__pycache__/
+*.py[cod]
+*$py.class
+
+test.py

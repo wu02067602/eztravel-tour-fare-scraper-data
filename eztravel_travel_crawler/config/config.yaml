@@ -6,6 +6,8 @@ api:
   endpoint_url: "https://flight.eztravel.com.tw/apiv2/flight/list"
   # 日期計算 API 端點 URL
   holiday_dates_api_url: "http://localhost:8000/calculate_holiday_dates"
+  # 固定月份日期計算 API 端點 URL
+  fixed_month_dates_api_url: "http://localhost:8000/calculate_dates"
   # API 認證令牌（如需要）
   auth_token: ""
   # 請求超時時間（秒）

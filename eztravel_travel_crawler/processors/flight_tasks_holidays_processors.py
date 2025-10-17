@@ -29,6 +29,10 @@ class FlightTasksHolidaysProcessors:
                     }
                 }
             ]
+        
+        Raises:
+            ValueError: 當 API 配置缺失時
+            requests.exceptions.RequestException: 當 API 請求失敗時
         """
         # 獲取基礎任務列表
         holidays_task_list = self._get_holidays_task_list()
@@ -36,38 +40,20 @@ class FlightTasksHolidaysProcessors:
         # 處理後的任務列表
         processed_flight_tasks = []
         
-        current_date = datetime.now()
-        current_year = current_date.year
-        current_month = current_date.month
-        
         # 遍歷每個基礎任務
         for base_task in holidays_task_list:
-            # 根據任務中的 Month 參數，計算出目標月份
+            # 根據任務中的 Month 參數調用 API
             month_offset = base_task["url_params"]["Month"]
-            target_month = current_month + month_offset
-            target_year = current_year
             
-            # 處理跨年的情況
-            while target_month > 12:
-                target_month -= 12
-                target_year += 1
+            # 調用 API 獲取節假日資料
+            holidays_data = self._fetch_holidays_from_api(month_offset)
             
-            # 獲取該月份的節假日資料
-            taiwan_holidays = self._fetch_taiwan_holidays(target_year, target_month)
-            
-            # 遍歷該月份的每個節假日
-            for holiday in taiwan_holidays:
-                if not holiday.get('description'):
-                    continue
-                elif self._is_skip_holiday(holiday, base_task):
-                    continue
-                    
-                # 獲取爬取日期範圍
-                date_ranges = self._get_crawl_date_ranges(holiday)
+            # 遍歷 API 返回的每個節假日
+            for holiday in holidays_data:
+                # 解析 API 返回的日期
+                dep_date = datetime.strptime(holiday['departure_date'], "%Y-%m-%d")
+                ret_date = datetime.strptime(holiday['return_date'], "%Y-%m-%d")
                 
-                # 為每個日期範圍生成任務
-                dep_date = date_ranges[0] 
-                ret_date = date_ranges[1]
                 processed_task = base_task.copy()
                 processed_task["url_params"] = base_task["url_params"].copy()
                 
@@ -86,149 +72,106 @@ class FlightTasksHolidaysProcessors:
                 # 生成任務名稱
                 dep_city = base_task["url_params"].get("DepCity1", "")
                 arr_city = base_task["url_params"].get("ArrCity1", "")
-                holiday_desc = holiday.get('description', '')
+                holiday_name = holiday['holiday_name']
                 
-                processed_task["name"] = f"{dep_city}到{arr_city} {holiday_desc} {dep_date.strftime('%Y-%m-%d')}出發 {ret_date.strftime('%Y-%m-%d')}回程"
+                processed_task["name"] = f"{dep_city}到{arr_city} {holiday_name} {dep_date.strftime('%Y-%m-%d')}出發 {ret_date.strftime('%Y-%m-%d')}回程"
                 
                 processed_flight_tasks.append(processed_task)
                     
         return processed_flight_tasks
     
-    def _is_skip_holiday(self, holiday: Dict, base_task: Dict) -> bool:
+    def _fetch_holidays_from_api(self, month_offset: int) -> List[Dict]:
         """
-        判斷是否是用特殊規則跳過此日期
-
-        參數:
-            holiday: 節假日資料
-
-        返回:
-            bool: 是否是用特殊規則跳過此日期
+        從日期計算 API 獲取指定月份偏移的節假日資料
+        
+        Args:
+            month_offset (int): 月份偏移量，表示從當前月份往後推幾個月
+            
+        Returns:
+            List[Dict]: 節假日資料列表，每個字典包含：
+                - holiday_name (str): 節假日名稱
+                - holiday_date (str): 節假日日期 (YYYY-MM-DD)
+                - departure_date (str): 出發日期 (YYYY-MM-DD)
+                - return_date (str): 回程日期 (YYYY-MM-DD)
+                - weekday (str): 星期幾
+        
+        Examples:
+            >>> processor._fetch_holidays_from_api(2)
+            [{
+                'holiday_name': '行憲紀念日',
+                'holiday_date': '2025-12-25',
+                'departure_date': '2025-12-21',
+                'return_date': '2025-12-25',
+                'weekday': '四'
+            }]
+        
+        Raises:
+            ValueError: 當 API 配置缺失或月份偏移量無效時
+            requests.exceptions.RequestException: 當 API 請求失敗時
         """
-        month = base_task["url_params"].get("Month", None)
-        date_str = holiday.get('date', '')
-        holiday_date = datetime.strptime(date_str, "%Y%m%d")
-        day = holiday_date.day
-
-        if any(keyword in holiday.get('description', '') for keyword in ['春節', '農曆除夕']):
-            return True
-
-        # HACK: 需求中描述 爬取「往後第2個月的5號～10號」以及「往後第6個月的24號～28號」
-        # 1. 若 國定假日 有在「固定區間」資料內，則僅爬取「固定區間」資料。
-        # 2. 若 國定假日 沒有在「固定區間」資料內，則要爬取「固定區間」資料與「國定假日區間」資料。
-        # 為滿足此需求因此如此設計
-        if month == 2 and 5 <= day <= 10:
-            return True
-        elif month == 6 and 24 <= day <= 28:
-            return True
-        else:
-            return False
+        if month_offset < 0:
+            raise ValueError(f"月份偏移量必須大於等於 0，當前值為 {month_offset}")
+        
+        # 從配置中獲取 API URL
+        api_config = self.config_manager.get_api_config()
+        api_url = api_config.get('holiday_dates_api_url')
+        
+        if not api_url:
+            raise ValueError("配置中缺少 holiday_dates_api_url")
+        
+        # 準備請求參數
+        payload = {
+            "month_offset": month_offset
+        }
+        
+        try:
+            # 調用 API
+            response = requests.post(
+                api_url,
+                json=payload,
+                timeout=api_config.get('timeout', 30)
+            )
+            response.raise_for_status()
+            
+            # 解析響應
+            result = response.json()
+            
+            if not result.get('success'):
+                error_msg = result.get('error', '未知錯誤')
+                raise ValueError(f"API 返回錯誤: {error_msg}")
+            
+            # 返回節假日資料
+            data = result.get('data', {})
+            holidays = data.get('holidays', [])
+            
+            return holidays
+            
+        except requests.exceptions.RequestException as e:
+            raise requests.exceptions.RequestException(
+                f"調用日期計算 API 失敗: {str(e)}"
+            )
 
     def _get_holidays_task_list(self) -> List[Dict]:
         """
         獲取節日爬蟲任務列表
 
-        返回:
+        Returns:
             List[Dict]: 節日爬蟲任務列表
+        
+        Examples:
+            >>> processor._get_holidays_task_list()
+            [{
+                'name': '範例： 四個月後的台北到新加坡節日',
+                'url_params': {
+                    'Month': 4,
+                    'DepCity1': 'TPE',
+                    'ArrCity1': 'SIN',
+                    ...
+                }
+            }]
+        
+        Raises:
+            ValueError: 當配置尚未加載時
         """
         return self.config_manager.get_flight_tasks_holidays()
-    
-    def _fetch_taiwan_holidays(self, target_year: int, target_month: int) -> List[Dict]:
-        """
-        從外部API獲取指定年月的台灣節假日資料
-        
-        參數:
-            target_year: 目標年份
-            target_month: 目標月份
-            
-        返回:
-            List[Dict]: 該月份的節假日資料列表
-        """
-        url = f"https://cdn.jsdelivr.net/gh/ruyut/TaiwanCalendar/data/{target_year}.json"
-        holidays_data = []
-        
-        try:
-            response = requests.get(url, timeout=10)
-            if response.status_code == 200:
-                year_data = response.content.decode('utf-8-sig')
-                year_data = json.loads(year_data)
-                # 只保留指定月份且有description的節假日
-                for holiday in year_data:
-                    if (holiday.get('isHoliday') and 
-                        holiday.get('description') != '' and
-                        holiday['date'].startswith(f"{target_year}{target_month:02d}")):
-                        holidays_data.append(holiday)
-                holidays_data = self._remove_holiday_with_compensatory_day(holidays_data)
-        except Exception as e:
-            print(f"無法獲取 {target_year} 年 {target_month} 月節假日資料: {e}")
-                
-        return holidays_data
-
-    def _remove_holiday_with_compensatory_day(self, holidays_data: List[Dict]) -> List[Dict]:
-        """
-        剔除API描述中補假的國定假日
-
-        如果資料中包含"補"這個字，則剔除
-        
-        參數:
-            holidays_data: 節假日資料列表
-            
-        返回:
-            List[Dict]: 剔除補假後的節假日資料列表
-        """
-        return [holiday for holiday in holidays_data if '補' not in holiday.get('description')]
-
-    def _get_crawl_date_ranges(self, holiday: Dict) -> tuple:
-        """
-        根據節假日和星期幾，返回需要爬取的日期範圍
-        
-        參數:
-            holiday: 節假日資料
-            
-        返回:
-            tuple: (出發日期, 回程日期)
-        """
-        # 解析日期
-        date_str = holiday['date']
-        holiday_date = datetime.strptime(date_str, "%Y%m%d")
-        weekday = holiday['week']
-        description = holiday.get('description', '')
-        
-        # 根據不同情況設定爬取日期
-        if '開國紀念日' in description and weekday == '三':
-            # 開國紀念日落在週三的特殊規則
-            crawl_dates = (holiday_date - timedelta(days=4), holiday_date)
-        elif '小年夜' in description:
-            # 春節規則（以小年夜為基準）
-            if weekday == '一':
-                crawl_dates = (holiday_date - timedelta(days=2), holiday_date + timedelta(days=4))
-            elif weekday == '二':
-                crawl_dates = (holiday_date - timedelta(days=3), holiday_date + timedelta(days=3))
-            elif weekday == '三':
-                crawl_dates = (holiday_date - timedelta(days=4), holiday_date + timedelta(days=2))
-            elif weekday == '四':
-                crawl_dates = (holiday_date - timedelta(days=2), holiday_date + timedelta(days=4))
-            elif weekday == '五':
-                crawl_dates = (holiday_date - timedelta(days=2), holiday_date + timedelta(days=4))
-            elif weekday == '六':
-                crawl_dates = (holiday_date - timedelta(days=2), holiday_date + timedelta(days=3))
-            elif weekday == '日':
-                crawl_dates = (holiday_date - timedelta(days=2), holiday_date + timedelta(days=3))
-        else:
-            # 一般國定假日規則
-            if weekday == '一':
-                crawl_dates = (holiday_date - timedelta(days=4), holiday_date)
-            elif weekday == '二':
-                crawl_dates = (holiday_date - timedelta(days=4), holiday_date)
-            elif weekday == '三':
-                crawl_dates = (holiday_date , holiday_date + timedelta(days=3))
-            elif weekday == '四':
-                crawl_dates = (holiday_date - timedelta(days=1), holiday_date + timedelta(days=3))
-            elif weekday == '五':
-                crawl_dates = (holiday_date - timedelta(days=2), holiday_date + timedelta(days=2))
-            elif weekday == '六':
-                crawl_dates = (holiday_date - timedelta(days=3), holiday_date + timedelta(days=1))
-            elif weekday == '日':
-                crawl_dates = (holiday_date - timedelta(days=4), holiday_date)
-                
-        return crawl_dates
  

@@ -57,6 +57,20 @@ class ConfigManager:
         except (FileNotFoundError, yaml.YAMLError) as e:
             raise e
 
+    def get_date_api_config(self):
+        """
+        獲取日期計算API配置
+        
+        返回日期計算API相關配置，包括API URL等。
+        
+        返回:
+            dict: 日期計算API配置字典
+        """
+        if not self.config:
+            raise ValueError("配置尚未加載，請先呼叫load_config方法")
+            
+        return self.config.get('date_api', {})
+
     def get_api_config(self):
         """
         獲取API配置

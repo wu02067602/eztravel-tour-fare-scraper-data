@@ -1,5 +1,14 @@
 # 易遊網機票資料爬蟲系統配置檔
 
+# 日期計算 API 配置
+date_api:
+  # 日期計算 API 端點 URL
+  endpoint_url: "http://localhost:8000/calculate_dates"
+  # API 認證令牌（如需要）
+  auth_token: ""
+  # 請求超時時間（秒）
+  timeout: 10
+
 # API 配置
 api:
   # requests API 端點 URL

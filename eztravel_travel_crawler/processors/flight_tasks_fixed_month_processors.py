@@ -1,4 +1,5 @@
 from config.config_manager import ConfigManager
+from copy import deepcopy
 from datetime import datetime
 from typing import Dict, List
 import requests
@@ -52,8 +53,7 @@ class FlightTasksFixedMonthProcessors:
             dep_date = datetime.strptime(date_data['departure_date'], "%Y-%m-%d")
             ret_date = datetime.strptime(date_data['return_date'], "%Y-%m-%d")
             
-            processed_task = task.copy()
-            processed_task["url_params"] = task["url_params"].copy()
+            processed_task = deepcopy(task)
             
             # 格式化日期為 DD/MM/YYYY
             dep_date_str = dep_date.strftime("%d/%m/%Y")
@@ -106,8 +106,8 @@ class FlightTasksFixedMonthProcessors:
             ValueError: 當 API 配置缺失或參數無效時
             requests.exceptions.RequestException: 當 API 請求失敗時
         """
-        if month_offset < 0:
-            raise ValueError(f"月份偏移量必須大於等於 0，當前值為 {month_offset}")
+        if month_offset <= 0:
+            raise ValueError(f"月份偏移量必須大於 0，當前值為 {month_offset}")
         
         if not (1 <= dep_day <= 31):
             raise ValueError(f"出發日期天數必須在 1-31 之間，當前值為 {dep_day}")

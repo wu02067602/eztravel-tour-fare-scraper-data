@@ -1,4 +1,5 @@
 from config.config_manager import ConfigManager
+from copy import deepcopy
 from datetime import datetime, timedelta
 from typing import Dict, List
 import requests
@@ -54,8 +55,7 @@ class FlightTasksHolidaysProcessors:
                 dep_date = datetime.strptime(holiday['departure_date'], "%Y-%m-%d")
                 ret_date = datetime.strptime(holiday['return_date'], "%Y-%m-%d")
                 
-                processed_task = base_task.copy()
-                processed_task["url_params"] = base_task["url_params"].copy()
+                processed_task = deepcopy(base_task)
                 
                 # 格式化日期為 DD/MM/YYYY
                 dep_date_str = dep_date.strftime("%d/%m/%Y")
@@ -110,7 +110,7 @@ class FlightTasksHolidaysProcessors:
             requests.exceptions.RequestException: 當 API 請求失敗時
         """
         if month_offset <= 0:
-            raise ValueError(f"月份偏移量必須大於等於 0，當前值為 {month_offset}")
+            raise ValueError(f"月份偏移量必須大於 0，當前值為 {month_offset}")
         
         # 從配置中獲取 API URL
         api_config = self.config_manager.get_api_config()

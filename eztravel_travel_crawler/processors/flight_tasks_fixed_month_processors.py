@@ -2,11 +2,12 @@ from config.config_manager import ConfigManager
 from copy import deepcopy
 from datetime import datetime
 from typing import Dict, List
-import requests
+from services.date_calculation_service import DateCalculationService
 
 class FlightTasksFixedMonthProcessors:
     def __init__(self, config_manager: ConfigManager):
         self.config_manager = config_manager
+        self.date_service = DateCalculationService(config_manager)
 
     def process_flight_tasks(self) -> List[Dict]:
         """
@@ -46,8 +47,10 @@ class FlightTasksFixedMonthProcessors:
             dep_day = int(task["url_params"]["DepDate1"])
             return_day = int(task["url_params"]["DepDate2"])
             
-            # 調用 API 獲取日期資料
-            date_data = self._fetch_dates_from_api(month_offset, dep_day, return_day)
+            # 調用日期計算服務獲取日期資料
+            date_data = self.date_service.calculate_fixed_month_dates(
+                month_offset, dep_day, return_day
+            )
             
             # 解析 API 返回的日期 (YYYY-MM-DD 格式)
             dep_date = datetime.strptime(date_data['departure_date'], "%Y-%m-%d")
@@ -77,81 +80,6 @@ class FlightTasksFixedMonthProcessors:
             
         return processed_flight_tasks
 
-    def _fetch_dates_from_api(self, month_offset: int, dep_day: int, return_day: int) -> Dict:
-        """
-        從固定月份日期計算 API 獲取日期資料
-        
-        Args:
-            month_offset (int): 月份偏移量，表示從當前月份往後推幾個月
-            dep_day (int): 出發日期的天數 (1-31)
-            return_day (int): 回程日期的天數 (1-31)
-            
-        Returns:
-            Dict: 日期資料字典，包含：
-                - departure_date (str): 出發日期 (YYYY-MM-DD)
-                - return_date (str): 回程日期 (YYYY-MM-DD)
-                - target_year (int): 目標年份
-                - target_month (int): 目標月份
-        
-        Examples:
-            >>> processor._fetch_dates_from_api(2, 5, 10)
-            {
-                'departure_date': '2025-12-05',
-                'return_date': '2025-12-10',
-                'target_year': 2025,
-                'target_month': 12
-            }
-        
-        Raises:
-            ValueError: 當 API 配置缺失或參數無效時
-            requests.exceptions.RequestException: 當 API 請求失敗時
-        """
-        if month_offset <= 0:
-            raise ValueError(f"月份偏移量必須大於 0，當前值為 {month_offset}")
-        
-        if not (1 <= dep_day <= 31):
-            raise ValueError(f"出發日期天數必須在 1-31 之間，當前值為 {dep_day}")
-        
-        if not (1 <= return_day <= 31):
-            raise ValueError(f"回程日期天數必須在 1-31 之間，當前值為 {return_day}")
-        
-        # 從配置中獲取 API URL
-        api_config = self.config_manager.get_api_config()
-        api_url = api_config.get('fixed_month_dates_api_url')
-        
-        if not api_url:
-            raise ValueError("配置中缺少 fixed_month_dates_api_url")
-        
-        # 準備請求參數
-        payload = {
-            "month_offset": month_offset,
-            "dep_day": dep_day,
-            "return_day": return_day
-        }
-        
-        try:
-            # 調用 API
-            response = requests.post(
-                api_url,
-                json=payload,
-                timeout=api_config.get('timeout', 30)
-            )
-            response.raise_for_status()
-            
-            # 解析響應
-            result = response.json()
-            
-            if not result.get('success'):
-                error_msg = result.get('error', '未知錯誤')
-                raise ValueError(f"API 返回錯誤: {error_msg}")
-            
-            # 返回日期資料
-            return result.get('data', {})
-            
-        except requests.exceptions.RequestException as e:
-            raise requests.exceptions.RequestException(
-                f"調用固定月份日期計算 API 失敗: {str(e)}"
-            )
 
     def _get_fixed_month_task_list(self) -> List[Dict]:
         """

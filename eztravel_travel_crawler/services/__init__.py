@@ -5,5 +5,6 @@
 """
 
 from .date_calculation_service import DateCalculationService
+from .holiday_calculation_service import HolidayCalculationService
 
-__all__ = ['DateCalculationService']
+__all__ = ['DateCalculationService', 'HolidayCalculationService']

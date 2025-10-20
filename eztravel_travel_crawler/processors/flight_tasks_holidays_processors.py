@@ -2,12 +2,12 @@ from config.config_manager import ConfigManager
 from copy import deepcopy
 from datetime import datetime, timedelta
 from typing import Dict, List
-from services.date_calculation_service import DateCalculationService
+from services.holiday_calculation_service import HolidayCalculationService
 
 class FlightTasksHolidaysProcessors:
     def __init__(self, config_manager: ConfigManager):
         self.config_manager = config_manager
-        self.date_service = DateCalculationService(config_manager)
+        self.holiday_service = HolidayCalculationService(config_manager)
 
     def process_flight_tasks(self) -> List[Dict]:
         """
@@ -46,8 +46,8 @@ class FlightTasksHolidaysProcessors:
             # 根據任務中的 Month 參數調用 API
             month_offset = base_task["url_params"]["Month"]
             
-            # 調用日期計算服務獲取節假日資料
-            holidays_data = self.date_service.calculate_holiday_dates(month_offset)
+            # 調用節日計算服務獲取節假日資料
+            holidays_data = self.holiday_service.calculate_holiday_dates(month_offset)
             
             # 遍歷 API 返回的每個節假日
             for holiday in holidays_data:

@@ -3,17 +3,17 @@ from typing import Dict, List
 import requests
 
 
-class DateCalculationService:
+class HolidayCalculationService:
     """
-    日期計算服務類別
+    節日計算服務類別
     
-    負責呼叫固定月份日期計算 API，提供固定月份日期計算功能。
-    專門處理固定月份的日期計算，根據月份偏移量和指定天數計算出發和回程日期。
+    負責呼叫節日日期計算 API，提供節日相關日期計算功能。
+    專門處理節假日的日期計算，包括出發日期和回程日期的計算。
     """
     
     def __init__(self, config_manager: ConfigManager):
         """
-        初始化日期計算服務
+        初始化節日計算服務
         
         Args:
             config_manager (ConfigManager): 配置管理器實例
@@ -21,7 +21,7 @@ class DateCalculationService:
         Examples:
             >>> from config.config_manager import ConfigManager
             >>> config_manager = ConfigManager()
-            >>> service = DateCalculationService(config_manager)
+            >>> service = HolidayCalculationService(config_manager)
         
         Raises:
             ValueError: 當 config_manager 為 None 時
@@ -30,69 +30,66 @@ class DateCalculationService:
             raise ValueError("config_manager 不能為 None")
         self.config_manager = config_manager
     
-    def calculate_fixed_month_dates(
-        self, 
-        month_offset: int, 
-        dep_day: int, 
-        return_day: int
-    ) -> Dict:
+    def calculate_holiday_dates(self, month_offset: int) -> List[Dict]:
         """
-        計算固定月份的航班日期
+        計算指定月份偏移的節日日期
+        
+        透過呼叫外部 API，根據月份偏移量獲取該月份內的所有節假日資訊，
+        包括節日名稱、日期以及建議的航班出發和回程日期。
         
         Args:
             month_offset (int): 月份偏移量，表示從當前月份往後推幾個月，必須大於 0
-            dep_day (int): 出發日期的天數 (1-31)
-            return_day (int): 回程日期的天數 (1-31)
             
         Returns:
-            Dict: 日期資料字典，包含：
-                - departure_date (str): 出發日期 (YYYY-MM-DD)
-                - return_date (str): 回程日期 (YYYY-MM-DD)
-                - target_year (int): 目標年份
-                - target_month (int): 目標月份
+            List[Dict]: 節假日資料列表，每個字典包含：
+                - holiday_name (str): 節假日名稱
+                - holiday_date (str): 節假日日期 (YYYY-MM-DD)
+                - departure_date (str): 建議的出發日期 (YYYY-MM-DD)
+                - return_date (str): 建議的回程日期 (YYYY-MM-DD)
+                - weekday (str): 星期幾
         
         Examples:
-            >>> service.calculate_fixed_month_dates(2, 5, 10)
-            {
-                'departure_date': '2025-12-05',
-                'return_date': '2025-12-10',
-                'target_year': 2025,
-                'target_month': 12
-            }
+            >>> service.calculate_holiday_dates(2)
+            [{
+                'holiday_name': '行憲紀念日',
+                'holiday_date': '2025-12-25',
+                'departure_date': '2025-12-21',
+                'return_date': '2025-12-25',
+                'weekday': '四'
+            }]
         
         Raises:
             ValueError: 當月份偏移量小於等於 0 時
-            ValueError: 當出發或回程日期天數不在 1-31 範圍內時
             ValueError: 當 API 配置缺失時
             ValueError: 當 API 返回錯誤時
             requests.exceptions.RequestException: 當 API 請求失敗時
         """
         # 參數驗證
         self._validate_month_offset(month_offset)
-        self._validate_day(dep_day, "出發日期")
-        self._validate_day(return_day, "回程日期")
         
         # 獲取 API 配置
         api_config = self.config_manager.get_api_config()
-        api_url = api_config.get('fixed_month_dates_api_url')
+        api_url = api_config.get('holiday_dates_api_url')
         
         if not api_url:
-            raise ValueError("配置中缺少 fixed_month_dates_api_url")
+            raise ValueError("配置中缺少 holiday_dates_api_url")
         
         # 準備請求參數
         payload = {
-            "month_offset": month_offset,
-            "dep_day": dep_day,
-            "return_day": return_day
+            "month_offset": month_offset
         }
         
         # 呼叫 API
-        return self._call_api(
+        result = self._call_api(
             api_url=api_url,
             payload=payload,
             timeout=api_config.get('timeout', 30),
-            error_message="調用固定月份日期計算 API 失敗"
+            error_message="調用節日日期計算 API 失敗"
         )
+        
+        # 從結果中提取節假日列表
+        holidays = result.get('holidays', [])
+        return holidays
     
     def _validate_month_offset(self, month_offset: int) -> None:
         """
@@ -107,20 +104,6 @@ class DateCalculationService:
         if month_offset <= 0:
             raise ValueError(f"月份偏移量必須大於 0，當前值為 {month_offset}")
     
-    def _validate_day(self, day: int, field_name: str) -> None:
-        """
-        驗證日期天數
-        
-        Args:
-            day (int): 日期天數
-            field_name (str): 欄位名稱，用於錯誤訊息
-            
-        Raises:
-            ValueError: 當日期天數不在 1-31 範圍內時
-        """
-        if not (1 <= day <= 31):
-            raise ValueError(f"{field_name}天數必須在 1-31 之間，當前值為 {day}")
-    
     def _call_api(
         self, 
         api_url: str, 
@@ -129,7 +112,7 @@ class DateCalculationService:
         error_message: str
     ) -> Dict:
         """
-        呼叫日期計算 API
+        呼叫節日日期計算 API
         
         Args:
             api_url (str): API URL

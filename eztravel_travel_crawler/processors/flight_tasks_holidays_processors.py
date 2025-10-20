@@ -109,7 +109,7 @@ class FlightTasksHolidaysProcessors:
             ValueError: 當 API 配置缺失或月份偏移量無效時
             requests.exceptions.RequestException: 當 API 請求失敗時
         """
-        if month_offset < 0:
+        if month_offset <= 0:
             raise ValueError(f"月份偏移量必須大於等於 0，當前值為 {month_offset}")
         
         # 從配置中獲取 API URL

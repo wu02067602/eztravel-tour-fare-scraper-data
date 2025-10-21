@@ -1,12 +1,13 @@
 from config.config_manager import ConfigManager
+from copy import deepcopy
 from datetime import datetime, timedelta
 from typing import Dict, List
-import requests
-import json
+from services.holiday_calculation_service import HolidayCalculationService
 
 class FlightTasksHolidaysProcessors:
     def __init__(self, config_manager: ConfigManager):
         self.config_manager = config_manager
+        self.holiday_service = HolidayCalculationService(config_manager)
 
     def process_flight_tasks(self) -> List[Dict]:
         """
@@ -45,8 +46,8 @@ class FlightTasksHolidaysProcessors:
             # 根據任務中的 Month 參數調用 API
             month_offset = base_task["url_params"]["Month"]
             
-            # 調用 API 獲取節假日資料
-            holidays_data = self._fetch_holidays_from_api(month_offset)
+            # 調用節日計算服務獲取節假日資料
+            holidays_data = self.holiday_service.calculate_holiday_dates(month_offset)
             
             # 遍歷 API 返回的每個節假日
             for holiday in holidays_data:
@@ -54,8 +55,7 @@ class FlightTasksHolidaysProcessors:
                 dep_date = datetime.strptime(holiday['departure_date'], "%Y-%m-%d")
                 ret_date = datetime.strptime(holiday['return_date'], "%Y-%m-%d")
                 
-                processed_task = base_task.copy()
-                processed_task["url_params"] = base_task["url_params"].copy()
+                processed_task = deepcopy(base_task)
                 
                 # 格式化日期為 DD/MM/YYYY
                 dep_date_str = dep_date.strftime("%d/%m/%Y")
@@ -80,76 +80,6 @@ class FlightTasksHolidaysProcessors:
                     
         return processed_flight_tasks
     
-    def _fetch_holidays_from_api(self, month_offset: int) -> List[Dict]:
-        """
-        從日期計算 API 獲取指定月份偏移的節假日資料
-        
-        Args:
-            month_offset (int): 月份偏移量，表示從當前月份往後推幾個月
-            
-        Returns:
-            List[Dict]: 節假日資料列表，每個字典包含：
-                - holiday_name (str): 節假日名稱
-                - holiday_date (str): 節假日日期 (YYYY-MM-DD)
-                - departure_date (str): 出發日期 (YYYY-MM-DD)
-                - return_date (str): 回程日期 (YYYY-MM-DD)
-                - weekday (str): 星期幾
-        
-        Examples:
-            >>> processor._fetch_holidays_from_api(2)
-            [{
-                'holiday_name': '行憲紀念日',
-                'holiday_date': '2025-12-25',
-                'departure_date': '2025-12-21',
-                'return_date': '2025-12-25',
-                'weekday': '四'
-            }]
-        
-        Raises:
-            ValueError: 當 API 配置缺失或月份偏移量無效時
-            requests.exceptions.RequestException: 當 API 請求失敗時
-        """
-        if month_offset <= 0:
-            raise ValueError(f"月份偏移量必須大於等於 0，當前值為 {month_offset}")
-        
-        # 從配置中獲取 API URL
-        api_config = self.config_manager.get_api_config()
-        api_url = api_config.get('holiday_dates_api_url')
-        
-        if not api_url:
-            raise ValueError("配置中缺少 holiday_dates_api_url")
-        
-        # 準備請求參數
-        payload = {
-            "month_offset": month_offset
-        }
-        
-        try:
-            # 調用 API
-            response = requests.post(
-                api_url,
-                json=payload,
-                timeout=api_config.get('timeout', 30)
-            )
-            response.raise_for_status()
-            
-            # 解析響應
-            result = response.json()
-            
-            if not result.get('success'):
-                error_msg = result.get('error', '未知錯誤')
-                raise ValueError(f"API 返回錯誤: {error_msg}")
-            
-            # 返回節假日資料
-            data = result.get('data', {})
-            holidays = data.get('holidays', [])
-            
-            return holidays
-            
-        except requests.exceptions.RequestException as e:
-            raise requests.exceptions.RequestException(
-                f"調用日期計算 API 失敗: {str(e)}"
-            )
 
     def _get_holidays_task_list(self) -> List[Dict]:
         """

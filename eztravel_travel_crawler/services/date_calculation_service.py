@@ -165,4 +165,5 @@ class DateCalculationService:
             return result.get('data', {})
             
         except requests.exceptions.RequestException as e:
-            raise requests.exceptions.RequestException(f"{error_message}: {str(e)}")
+            print(f"DateCalculationService API 請求失敗: {e}")
+            raise

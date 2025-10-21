@@ -4,6 +4,10 @@
 api:
   # requests API 端點 URL
   endpoint_url: "https://flight.eztravel.com.tw/apiv2/flight/list"
+  # 日期計算 API 端點 URL
+  holiday_dates_api_url: "https://domanda-get-date-data-934329676269.asia-east1.run.app/calculate_holiday_dates"
+  # 固定月份日期計算 API 端點 URL
+  fixed_month_dates_api_url: "https://domanda-get-date-data-934329676269.asia-east1.run.app/calculate_dates"
   # API 認證令牌（如需要）
   auth_token: ""
   # 請求超時時間（秒）
